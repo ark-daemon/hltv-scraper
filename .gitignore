@@ -1,0 +1,23 @@
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Runtime output
+logs/
+exports/
+checkpoints/
+
+# Secrets
+.env
+
+.pytest_cache/
+
+# Archives
+*.tar.gz
+*.zip
