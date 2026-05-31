@@ -6,6 +6,8 @@ import re
 from datetime import datetime, timezone
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL
 from scrapers.base import BaseScraper
 
@@ -61,7 +63,7 @@ class PlayerRankingsScraper(BaseScraper):
     # Parsing
     # ------------------------------------------------------------------
 
-    def _parse_top20(self, soup, year: int) -> list[dict]:
+    def _parse_top20(self, soup: BeautifulSoup, year: int) -> list[dict]:
         """
         Parse the Top 20 players from an annual HLTV news article.
 

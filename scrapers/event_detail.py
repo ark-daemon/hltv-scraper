@@ -7,6 +7,8 @@ import os
 import re
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL, CHECKPOINT_DIR
 from scrapers.base import BaseScraper
 
@@ -77,7 +79,7 @@ class EventDetailScraper(BaseScraper):
     # Parsing
     # ------------------------------------------------------------------
 
-    def _parse_event_teams(self, soup, event_id: int) -> list[dict]:
+    def _parse_event_teams(self, soup: BeautifulSoup, event_id: int) -> list[dict]:
         """Extract team placement rows from an event detail page."""
         rows = []
 

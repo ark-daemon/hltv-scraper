@@ -67,18 +67,6 @@ class BaseScraper(ABC):
         except (IndexError, ValueError):
             return None
 
-    def extract_id_from_url_regex(self, url: str, pattern: str) -> int | None:
-        """Extract an integer from a URL using a regex pattern."""
-        if not url:
-            return None
-        match = re.search(pattern, url)
-        if match:
-            try:
-                return int(match.group(1))
-            except (ValueError, IndexError):
-                return None
-        return None
-
     # ------------------------------------------------------------------
     # Safe element reading
     # ------------------------------------------------------------------

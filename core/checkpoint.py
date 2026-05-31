@@ -65,7 +65,7 @@ class Checkpoint:
                 logger.info(
                     f"[Checkpoint] Loaded state.json - {total} completed items across all scrapers."
                 )
-            except (json.JSONDecodeError, Exception) as e:
+            except (json.JSONDecodeError, OSError, ValueError) as e:
                 logger.warning(
                     f"[Checkpoint] Could not load state.json ({e}). Starting fresh."
                 )

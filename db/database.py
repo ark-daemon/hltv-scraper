@@ -136,14 +136,23 @@ class Database:
         conflict = "REPLACE" if replace else "IGNORE"
         sql = f"INSERT OR {conflict} INTO {table} ({columns}) VALUES ({placeholders})"
         values = [list(row.values()) for row in rows]
+
+        # Chunk to stay within SQLite default SQLITE_MAX_VARIABLE_NUMBER (999)
+        col_count = len(rows[0])
+        chunk_size = max(1, 999 // col_count)
+        total_inserted = 0
+
         try:
-            async with self._conn.executemany(sql, values) as cursor:
-                await self._conn.commit()
-                # sqlite may return -1 for rowcount on executemany; normalize to attempted rows.
-                return cursor.rowcount if cursor.rowcount is not None and cursor.rowcount >= 0 else len(rows)
+            for i in range(0, len(values), chunk_size):
+                chunk = values[i : i + chunk_size]
+                async with self._conn.executemany(sql, chunk) as cursor:
+                    await self._conn.commit()
+                    rc = cursor.rowcount
+                    total_inserted += rc if rc is not None and rc >= 0 else len(chunk)
+            return total_inserted
         except Exception as e:
             logger.error(f"[DB] bulk_insert error on {table}: {e}")
-            return 0
+            return -1
 
     async def get_all_ids(self, table: str, id_column: str) -> set:
         """Return a set of all existing IDs for a given table + column."""
@@ -167,14 +176,14 @@ class Database:
             logger.error(f"[DB] row_count error on {table}: {e}")
             return 0
 
-    async def execute(self, sql: str, params: list = None) -> list:
+    async def execute(self, sql: str, params: list | None = None) -> list[tuple]:
         """Execute arbitrary SQL and return all rows."""
         try:
             async with self._conn.execute(sql, params or []) as cursor:
                 return await cursor.fetchall()
         except Exception as e:
             logger.error(f"[DB] execute error: {e} | sql={sql}")
-            return []
+            raise
 
     async def get_table_names(self) -> list[str]:
         """Return list of all user table names in the database (excludes sqlite internals)."""

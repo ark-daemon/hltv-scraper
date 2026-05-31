@@ -8,6 +8,8 @@ import os
 from dateutil import parser as dateparser
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL, CHECKPOINT_DIR
 from scrapers.base import BaseScraper
 
@@ -25,6 +27,18 @@ class RosterHistoryScraper(BaseScraper):
         stats = {"processed": 0, "inserted": 0, "skipped": 0, "errors": 0}
 
         team_id_map = self._load_team_ids()
+        if not team_id_map:
+            # Fallback: query DB for known team IDs
+            db_ids = await self.db.get_all_ids("teams", "team_id")
+            if not db_ids:
+                t1_ids = await self.db.get_all_ids("matches", "team1_id")
+                t2_ids = await self.db.get_all_ids("matches", "team2_id")
+                db_ids = t1_ids | t2_ids
+            team_id_map = {str(tid): f"team-{tid}" for tid in db_ids if tid}
+            if team_id_map:
+                logger.info(
+                    f"[{self.name}] Fallback: loaded {len(team_id_map)} team IDs from DB."
+                )
         if not team_id_map:
             logger.warning(f"[{self.name}] No team IDs found. Run TeamsScraper first.")
             return stats
@@ -67,7 +81,7 @@ class RosterHistoryScraper(BaseScraper):
     # Parsing
     # ------------------------------------------------------------------
 
-    def _parse_roster_history(self, soup, team_id: int) -> list[dict]:
+    def _parse_roster_history(self, soup: BeautifulSoup, team_id: int) -> list[dict]:
         """Extract lineup history and current roster from a team page."""
         rows = []
         seen_player_ids = set()

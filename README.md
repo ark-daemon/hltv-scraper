@@ -110,14 +110,15 @@ player_match_stats               2,341,002
 ...
 ```
 
-### Export to CSV
+### Export to CSV / JSON
 
 ```bash
-python main.py export --csv                   # export all tables
-python main.py export --table matches         # export one specific table
+python main.py export --csv                   # export all tables to CSV
+python main.py export --json                  # export all tables to JSON
+python main.py export --table matches         # export one specific table to CSV
 ```
 
-CSV files are written to `exports/` with today's date in the filename.
+Files are written to `exports/` with today's date in the filename.
 
 ---
 

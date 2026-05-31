@@ -21,3 +21,17 @@ checkpoints/
 # Archives
 *.tar.gz
 *.zip
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+
+# IDE / tooling
+.vscode/
+.idea/
+
+# Type checking / coverage
+.mypy_cache/
+.coverage
+htmlcov/

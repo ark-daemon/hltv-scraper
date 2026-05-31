@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL, CHECKPOINT_DIR
 from scrapers.base import BaseScraper
 
@@ -28,6 +30,16 @@ class PlayerStatsScraper(BaseScraper):
         stats = {"processed": 0, "inserted": 0, "skipped": 0, "errors": 0}
 
         player_id_map = self._load_player_ids()
+        if not player_id_map:
+            # Fallback: query DB for known player IDs
+            db_ids = await self.db.get_all_ids("players", "player_id")
+            if not db_ids:
+                db_ids = await self.db.get_all_ids("player_match_stats", "player_id")
+            player_id_map = {str(pid): f"player-{pid}" for pid in db_ids if pid}
+            if player_id_map:
+                logger.info(
+                    f"[{self.name}] Fallback: loaded {len(player_id_map)} player IDs from DB."
+                )
         if not player_id_map:
             logger.warning(
                 f"[{self.name}] No player IDs found. Run PlayersScraper first."
@@ -75,7 +87,7 @@ class PlayerStatsScraper(BaseScraper):
                         "player_event_stats", event_rows, replace=True
                     )
                     inserted_count += n
-                    if n <= 0:
+                    if n < 0:
                         write_failed = True
                         errors += 1
             else:
@@ -91,7 +103,7 @@ class PlayerStatsScraper(BaseScraper):
                         "player_map_stats", map_rows, replace=True
                     )
                     inserted_count += n
-                    if n <= 0:
+                    if n < 0:
                         write_failed = True
                         errors += 1
             else:
@@ -117,7 +129,7 @@ class PlayerStatsScraper(BaseScraper):
     # Career stats
     # ------------------------------------------------------------------
 
-    def _parse_career_stats(self, soup, player_id: int) -> dict | None:
+    def _parse_career_stats(self, soup: BeautifulSoup, player_id: int) -> dict | None:
         """Extract career stat values from the stats overview page."""
         try:
             stat_map = {}
@@ -209,7 +221,7 @@ class PlayerStatsScraper(BaseScraper):
             return self.safe_text(tds[fallback_idx])
         return None
 
-    def _parse_event_stats(self, soup, player_id: int) -> list[dict]:
+    def _parse_event_stats(self, soup: BeautifulSoup, player_id: int) -> list[dict]:
         """Extract per-event stats rows."""
         rows = []
         table = soup.select_one("table.stats-table")
@@ -281,7 +293,7 @@ class PlayerStatsScraper(BaseScraper):
     # Map stats
     # ------------------------------------------------------------------
 
-    def _parse_map_stats(self, soup, player_id: int) -> list[dict]:
+    def _parse_map_stats(self, soup: BeautifulSoup, player_id: int) -> list[dict]:
         """Extract per-map-type stats rows."""
         rows = []
         table = soup.select_one("table.stats-table")

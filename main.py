@@ -61,13 +61,26 @@ _checkpoint: Checkpoint | None = None
 # Graceful shutdown
 
 
-def _signal_handler(sig, frame):
-    logger.warning(f"Received signal {sig}. Shutting down...")
-    sys.exit(0)
+def _signal_handler():
+    logger.warning("Received shutdown signal. Cancelling tasks...")
+    raise SystemExit(0)
 
 
-signal.signal(signal.SIGINT, _signal_handler)
-signal.signal(signal.SIGTERM, _signal_handler)
+def _install_signal_handlers() -> None:
+    """Install signal handlers using asyncio when possible (Unix),
+    falling back to plain signal.signal on Windows."""
+    try:
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGINT, _signal_handler)
+        loop.add_signal_handler(signal.SIGTERM, _signal_handler)
+    except (NotImplementedError, RuntimeError):
+        # Windows or no running loop yet — fall back to sync handlers
+        def _sync_handler(sig, frame):
+            logger.warning(f"Received signal {sig}. Shutting down...")
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, _sync_handler)
+        signal.signal(signal.SIGTERM, _sync_handler)
 
 
 # Setup
@@ -290,7 +303,7 @@ async def cmd_scrape_single_match(match_url: str, db, browser, checkpoint):
                 "match_id": match_id,
                 "status": "completed",
                 "hltv_url": match_url,
-            "scraped_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "scraped_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             },
         )
 
@@ -354,16 +367,21 @@ async def cmd_scrape_single_match(match_url: str, db, browser, checkpoint):
 
 async def cmd_export(args, db):
     exporter = Exporter(db_path=config.DB_PATH, export_dir=config.EXPORT_DIR)
-    if args.csv:
-        exporter.export_all()
-    elif args.table:
+    if args.table:
         if args.table not in ALL_TABLES:
             print(f"Invalid table '{args.table}'.")
             print(f"Allowed tables: {', '.join(ALL_TABLES)}")
             return
-        exporter.export_table(args.table)
+        if args.json:
+            await asyncio.to_thread(exporter.export_table_json, args.table)
+        else:
+            await asyncio.to_thread(exporter.export_table, args.table)
+    elif args.csv:
+        await asyncio.to_thread(exporter.export_all)
+    elif args.json:
+        await asyncio.to_thread(exporter.export_all_json)
     else:
-        print("Specify --csv or --table TABLE_NAME")
+        print("Specify --csv, --json, or --table TABLE_NAME")
 
 
 async def cmd_status(db):
@@ -418,8 +436,9 @@ async def _main():
     )
 
     # export
-    export_p = subparsers.add_parser("export", help="Export DB tables to CSV")
+    export_p = subparsers.add_parser("export", help="Export DB tables to CSV/JSON")
     export_p.add_argument("--csv", action="store_true", help="Export ALL tables to CSV")
+    export_p.add_argument("--json", action="store_true", help="Export ALL tables to JSON")
     export_p.add_argument(
         "--table", metavar="TABLE_NAME", help="Export a specific table"
     )
@@ -433,6 +452,7 @@ async def _main():
         return
 
     db, browser, checkpoint = await _startup()
+    _install_signal_handlers()
 
     try:
         if args.command == "scrape":
@@ -447,5 +467,9 @@ async def _main():
         await db.close()
 
 
-if __name__ == "__main__":
+def main():
     asyncio.run(_main())
+
+
+if __name__ == "__main__":
+    main()

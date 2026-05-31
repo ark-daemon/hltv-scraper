@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL, CHECKPOINT_DIR
 from scrapers.base import BaseScraper
 
@@ -119,7 +121,7 @@ class TeamsScraper(BaseScraper):
     # Profile parsing
     # ------------------------------------------------------------------
 
-    def _parse_team_profile(self, soup, team_id: int, url: str) -> dict | None:
+    def _parse_team_profile(self, soup: BeautifulSoup, team_id: int, url: str) -> dict | None:
         """Extract all fields from a team profile page."""
         try:
             # Name

@@ -291,3 +291,43 @@ CREATE TABLE IF NOT EXISTS news (
     related_event_id INTEGER,
     scraped_at      TEXT
 );
+
+-- Indexes for common query patterns and foreign-key joins
+CREATE INDEX IF NOT EXISTS idx_matches_team1 ON matches(team1_id);
+CREATE INDEX IF NOT EXISTS idx_matches_team2 ON matches(team2_id);
+CREATE INDEX IF NOT EXISTS idx_matches_event ON matches(event_id);
+CREATE INDEX IF NOT EXISTS idx_matches_date ON matches(date);
+CREATE INDEX IF NOT EXISTS idx_matches_timestamp ON matches(timestamp);
+
+CREATE INDEX IF NOT EXISTS idx_map_results_match ON map_results(match_id);
+CREATE INDEX IF NOT EXISTS idx_map_results_map ON map_results(map_number);
+
+CREATE INDEX IF NOT EXISTS idx_player_match_stats_match ON player_match_stats(match_id);
+CREATE INDEX IF NOT EXISTS idx_player_match_stats_player ON player_match_stats(player_id);
+CREATE INDEX IF NOT EXISTS idx_player_match_stats_team ON player_match_stats(team_id);
+
+CREATE INDEX IF NOT EXISTS idx_player_career_stats_player ON player_career_stats(player_id);
+CREATE INDEX IF NOT EXISTS idx_player_event_stats_player ON player_event_stats(player_id);
+CREATE INDEX IF NOT EXISTS idx_player_event_stats_event ON player_event_stats(event_id);
+CREATE INDEX IF NOT EXISTS idx_player_map_stats_player ON player_map_stats(player_id);
+
+CREATE INDEX IF NOT EXISTS idx_team_stats_team ON team_stats(team_id);
+CREATE INDEX IF NOT EXISTS idx_team_map_stats_team ON team_map_stats(team_id);
+
+CREATE INDEX IF NOT EXISTS idx_roster_history_team ON roster_history(team_id);
+CREATE INDEX IF NOT EXISTS idx_roster_history_player ON roster_history(player_id);
+
+CREATE INDEX IF NOT EXISTS idx_event_teams_event ON event_teams(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_teams_team ON event_teams(team_id);
+
+CREATE INDEX IF NOT EXISTS idx_world_rankings_date ON world_rankings(snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_world_rankings_team ON world_rankings(team_id);
+
+CREATE INDEX IF NOT EXISTS idx_player_rankings_year ON player_rankings(year);
+CREATE INDEX IF NOT EXISTS idx_player_rankings_player ON player_rankings(player_id);
+
+CREATE INDEX IF NOT EXISTS idx_news_date ON news(date);
+CREATE INDEX IF NOT EXISTS idx_news_author ON news(author);
+CREATE INDEX IF NOT EXISTS idx_news_related_team ON news(related_team_id);
+CREATE INDEX IF NOT EXISTS idx_news_related_player ON news(related_player_id);
+CREATE INDEX IF NOT EXISTS idx_news_related_event ON news(related_event_id);

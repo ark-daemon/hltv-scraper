@@ -9,7 +9,8 @@ import os
 from datetime import datetime, timezone
 
 from loguru import logger
-from tqdm import tqdm
+
+from bs4 import BeautifulSoup
 
 from config import BASE_URL, CHECKPOINT_DIR
 from scrapers.base import BaseScraper
@@ -36,6 +37,8 @@ class MatchesScraper(BaseScraper):
         # Step 1 — Historical results (paginated)
         offset = 0
         page_num = 0
+        max_consecutive_errors = 5
+        consecutive_errors = 0
         while True:
             url = f"{BASE_URL}/results?offset={offset}"
             soup = await self.fetch(url)
@@ -44,8 +47,15 @@ class MatchesScraper(BaseScraper):
                     f"[{self.name}] Failed to fetch results page offset={offset}"
                 )
                 stats["errors"] += 1
+                consecutive_errors += 1
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.error(
+                        f"[{self.name}] {max_consecutive_errors} consecutive fetch failures. Stopping results pagination."
+                    )
+                    break
                 offset += 100
                 continue
+            consecutive_errors = 0
 
             rows = self._parse_result_rows(soup)
             if not rows:
@@ -112,7 +122,7 @@ class MatchesScraper(BaseScraper):
     # Parsing helpers
     # ------------------------------------------------------------------
 
-    def _parse_result_rows(self, soup) -> list[dict]:
+    def _parse_result_rows(self, soup: BeautifulSoup) -> list[dict]:
         """Parse match result rows from the /results page."""
         rows = []
         result_lists = soup.select("div.results-holder div.results-sublist")

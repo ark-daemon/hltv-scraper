@@ -11,6 +11,8 @@ import re
 
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL, CHECKPOINT_DIR
 from scrapers.base import BaseScraper
 
@@ -91,7 +93,7 @@ class MatchStatsScraper(BaseScraper):
                     "player_match_stats", all_rows, replace=True
                 )
                 stats["inserted"] += inserted
-                if inserted <= 0:
+                if inserted < 0:
                     write_failed = True
                     stats["errors"] += 1
                     logger.warning(
@@ -117,7 +119,7 @@ class MatchStatsScraper(BaseScraper):
     # ------------------------------------------------------------------
 
     def _parse_scoreboard(
-        self, soup, match_id: int, map_number: int, map_name: str, side: str
+        self, soup: BeautifulSoup, match_id: int, map_number: int, map_name: str, side: str
     ) -> list[dict]:
         """Parse a player stats scoreboard table from a mapstats page."""
         rows = []
@@ -188,14 +190,29 @@ class MatchStatsScraper(BaseScraper):
         hs_percent = self.parse_percent(text)
         hs_kills = None
 
-        # Common forms include bracketed number for raw HS kills.
-        paren_nums = re.findall(r"\((\d+)\)", text)
-        if paren_nums:
-            hs_kills = self.parse_int(paren_nums[0])
-        else:
-            # If a plain leading integer exists alongside percent, treat as HS kills.
+        # Strategy 1: number immediately before opening paren, e.g. "7 (53.8%)"
+        # Negative lookbehind avoids matching trailing digits of a decimal.
+        before_parens = re.search(r"(?<![\d.])(\d+)\s*\(", text)
+        if before_parens:
+            hs_kills = self.parse_int(before_parens.group(1))
+
+        # Strategy 2: number inside parens that is not part of a percentage,
+        # e.g. "53.8% (7)"
+        if hs_kills is None:
+            for match in re.finditer(r"\((\d+)\)", text):
+                num = match.group(1)
+                start = text.rfind("(", 0, match.start() + 1)
+                end = text.find(")", match.start())
+                if end != -1:
+                    content = text[start + 1 : end]
+                    if "%" not in content and "." not in content:
+                        hs_kills = self.parse_int(num)
+                        break
+
+        # Strategy 3: bare number with no percent sign (plain "7")
+        if hs_kills is None and "%" not in text:
             leading = re.match(r"^(\d+)\s*", text.strip())
-            if leading and "%" in text:
+            if leading:
                 hs_kills = self.parse_int(leading.group(1))
 
         return hs_percent, hs_kills

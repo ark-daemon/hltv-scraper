@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL
 from scrapers.base import BaseScraper
 
@@ -87,7 +89,7 @@ class NewsScraper(BaseScraper):
     # Parsing
     # ------------------------------------------------------------------
 
-    def _parse_news_archive(self, soup) -> list[dict]:
+    def _parse_news_archive(self, soup: BeautifulSoup) -> list[dict]:
         """Parse all news article rows from a monthly archive page."""
         articles = []
 

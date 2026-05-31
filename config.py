@@ -7,11 +7,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_PATH = "hltv.db"
-CHECKPOINT_DIR = "checkpoints/"
-LOG_DIR = "logs/"
-EXPORT_DIR = "exports/"
-BASE_URL = os.getenv("BASE_URL", "https://www.hltv.org")
+DB_PATH = os.getenv("DB_PATH", "hltv.db")
+CHECKPOINT_DIR = os.getenv("CHECKPOINT_DIR", "checkpoints/")
+LOG_DIR = os.getenv("LOG_DIR", "logs/")
+EXPORT_DIR = os.getenv("EXPORT_DIR", "exports/")
+BASE_URL = os.getenv("BASE_URL", "https://www.hltv.org").rstrip("/")
 
 # --- Delay settings (NO proxies, human-like pacing) ---
 MIN_DELAY = 4.0  # minimum seconds between every request

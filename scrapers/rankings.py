@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL
 from scrapers.base import BaseScraper
 
@@ -67,10 +69,12 @@ class RankingsScraper(BaseScraper):
             url = f"{BASE_URL}/ranking/teams/{dt.year}/{month_name}/{day}"
 
             rank_rows = await self._scrape_ranking_page(url, snapshot_date=date_key)
+            if rank_rows is None:
+                stats["errors"] += 1
+                continue  # Do NOT mark done; will retry next run
             if rank_rows:
                 n = await self.db.bulk_insert("world_rankings", rank_rows, replace=True)
                 stats["inserted"] += n
-            # Mark done even if empty (no ranking for that date = skip)
             self.checkpoint.mark_done(self.SCRAPER_KEY, date_key)
             stats["processed"] += 1
 
@@ -88,14 +92,14 @@ class RankingsScraper(BaseScraper):
     # Scraping
     # ------------------------------------------------------------------
 
-    async def _scrape_ranking_page(self, url: str, snapshot_date: str) -> list[dict]:
-        """Fetch a ranking page and return parsed rows."""
+    async def _scrape_ranking_page(self, url: str, snapshot_date: str) -> list[dict] | None:
+        """Fetch a ranking page and return parsed rows, or None on fetch failure."""
         soup = await self.fetch(url)
         if soup is None:
-            return []
+            return None
         return self._parse_ranking_page(soup, snapshot_date)
 
-    def _parse_ranking_page(self, soup, snapshot_date: str) -> list[dict]:
+    def _parse_ranking_page(self, soup: BeautifulSoup, snapshot_date: str) -> list[dict]:
         """Extract team ranking rows from a ranking page."""
         rows = []
 

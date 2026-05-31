@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL, CHECKPOINT_DIR
 from scrapers.base import BaseScraper
 
@@ -124,7 +126,7 @@ class PlayersScraper(BaseScraper):
     # Profile parsing
     # ------------------------------------------------------------------
 
-    def _parse_player_profile(self, soup, player_id: int, url: str) -> dict | None:
+    def _parse_player_profile(self, soup: BeautifulSoup, player_id: int, url: str) -> dict | None:
         """Extract all fields from a player profile page."""
         try:
             # Nickname

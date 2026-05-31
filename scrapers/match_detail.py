@@ -11,6 +11,8 @@ import re
 
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL, CHECKPOINT_DIR
 from scrapers.base import BaseScraper
 
@@ -73,7 +75,7 @@ class MatchDetailScraper(BaseScraper):
                     "map_results", map_rows, replace=True
                 )
                 stats["inserted"] += inserted
-                if inserted <= 0:
+                if inserted < 0:
                     write_failed = True
                     stats["errors"] += 1
                     logger.warning(
@@ -108,7 +110,7 @@ class MatchDetailScraper(BaseScraper):
     # Parsing
     # ------------------------------------------------------------------
 
-    def _parse_match_detail(self, soup, match_id: int) -> tuple[list[dict], list[dict]]:
+    def _parse_match_detail(self, soup: BeautifulSoup, match_id: int) -> tuple[list[dict], list[dict]]:
         """Parse map results and mapstats links from a match detail page."""
         map_rows = []
         mapstats_entries = []

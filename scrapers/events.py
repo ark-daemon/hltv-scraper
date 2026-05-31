@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 
 from loguru import logger
 
+from bs4 import BeautifulSoup
+
 from config import BASE_URL, CHECKPOINT_DIR
 from scrapers.base import BaseScraper
 
@@ -33,13 +35,22 @@ class EventsScraper(BaseScraper):
 
         # Step 1 — Archive (paginated)
         offset = 0
+        max_consecutive_errors = 5
+        consecutive_errors = 0
         while True:
             url = f"{BASE_URL}/events/archive?offset={offset}"
             soup = await self.fetch(url)
             if soup is None:
                 stats["errors"] += 1
+                consecutive_errors += 1
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.error(
+                        f"[{self.name}] {max_consecutive_errors} consecutive fetch failures. Stopping archive pagination."
+                    )
+                    break
                 offset += 50
                 continue
+            consecutive_errors = 0
 
             events = self._parse_event_list(soup, is_completed=1)
             if not events:
@@ -94,7 +105,7 @@ class EventsScraper(BaseScraper):
     # Parsing
     # ------------------------------------------------------------------
 
-    def _parse_event_list(self, soup, is_completed: int) -> list[dict]:
+    def _parse_event_list(self, soup: BeautifulSoup, is_completed: int) -> list[dict]:
         """Parse event rows from an events list page."""
         events = []
         seen_ids: set[int] = set()

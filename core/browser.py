@@ -6,6 +6,7 @@ automatic session restarts every 200 requests to maintain stable access.
 """
 
 import asyncio
+import sys
 
 from bs4 import BeautifulSoup
 from loguru import logger
@@ -92,7 +93,10 @@ class BrowserManager:
             if self._page:
                 await self._page.close()
             if self._provider_ctx:
-                await self._provider_ctx.__aexit__(None, None, None)
+                # Pass active exception info so the context manager can
+                # handle cleanup correctly (e.g. kill leaked subprocesses).
+                exc_info = sys.exc_info()
+                await self._provider_ctx.__aexit__(*exc_info)
             elif self._browser:
                 await self._browser.close()
             self._page = None
@@ -179,8 +183,13 @@ class BrowserManager:
                         await self.restart()
                     except Exception as exc:
                         logger.warning(
-                            f"[Scraper] Swallowed exception: {exc}", exc_info=True
+                            f"[Browser] Restart failed: {exc}", exc_info=True
                         )
+                        # Force full re-launch on next attempt
+                        self._launched = False
+                        self._page = None
+                        self._browser = None
+                        self._provider_ctx = None
                 continue
 
         logger.error(

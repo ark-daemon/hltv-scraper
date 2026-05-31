@@ -7,6 +7,7 @@ No bypasses. No fast paths. Always sleeps.
 
 import asyncio
 import random
+import threading
 import time
 
 from loguru import logger
@@ -32,11 +33,13 @@ class RateLimiter:
     """
 
     _instance: "RateLimiter | None" = None
+    _lock = threading.Lock()
 
     def __new__(cls) -> "RateLimiter":
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                cls._instance._initialized = False
         return cls._instance
 
     def __init__(self) -> None:
