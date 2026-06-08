@@ -1,6 +1,8 @@
-# Structural Data Extraction Pipeline
+# HLTV Scraper — CS2 Esports Data Pipeline
 
-A production-grade, modular Python architecture for automated DOM parsing and structural data extraction from dynamic web platforms. Designed for long-running, resilient data harvesting with built-in checkpointing, human-like request pacing, and deterministic JSON/CSV pipeline output.
+An async Python 3.11+ pipeline for extracting CS2 esports data from HLTV.org — match results, player stats, team rankings, event placements, and full news archives. Built for performance analytics, betting research, and historical backfill of competitive CS2 data.
+
+Scraped data covers matches, maps, round-by-round scorelines, player career stats, team rosters, world rankings (weekly snapshots), and tournament results — all stored in a normalized SQLite warehouse and exportable to CSV or JSON.
 
 ---
 
