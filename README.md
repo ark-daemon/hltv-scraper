@@ -4,9 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-beta-orange.svg)](CHANGELOG.md)
 
-Async SQLite warehouse for **CS2 esports pages on [HLTV.org](https://www.hltv.org)** — single-browser crawl, multi-second human pacing, checkpointed extractors, CSV/JSON export.
+Async SQLite warehouse for **CS2 esports pages on [HLTV.org](https://www.hltv.org)** â€” single-browser crawl, multi-second human pacing, checkpointed extractors, CSV/JSON export.
 
-**Fleet:** [vlr-scraper](https://github.com/ark-daemon/vlr-scraper) · [dota2-scraper](https://github.com/ark-daemon/dota2-scraper) · [rocket-league-scraper](https://github.com/ark-daemon/rocket-league-scraper) · [lol-esports-scraper](https://github.com/ark-daemon/lol-esports-scraper)
+**Fleet:** [vlr-scraper](https://github.com/ark-daemon/vlr-scraper) Â· [dota2-scraper](https://github.com/ark-daemon/dota2-scraper) Â· [rocket-league-scraper](https://github.com/ark-daemon/rocket-league-scraper) Â· [lol-esports-scraper](https://github.com/ark-daemon/lol-esports-scraper)
 
 ---
 
@@ -21,23 +21,23 @@ Maturity: **beta (`0.1.0`)**. Default pacing is deliberately slow (seconds per p
 ## Architecture
 
 ```
-CLI (argparse) ──► BrowserManager (CloakBrowser | Camoufox)
-                          │
-                          │  rate_limiter.wait() before every fetch
-                          │  BeautifulSoup(html, "lxml")
-                          ▼
+CLI (argparse) â”€â”€â–º BrowserManager (CloakBrowser | Camoufox)
+                          â”‚
+                          â”‚  rate_limiter.wait() before every fetch
+                          â”‚  BeautifulSoup(html, "lxml")
+                          â–¼
               scrapers/* (one domain per module)
-                matches → match_detail → match_stats
-                players → player_stats
-                teams → team_stats → roster_history
-                events → event_detail
+                matches â†’ match_detail â†’ match_stats
+                players â†’ player_stats
+                teams â†’ team_stats â†’ roster_history
+                events â†’ event_detail
                 rankings / player_rankings / news
-                          │
-                          ▼
+                          â”‚
+                          â–¼
               aiosqlite (hltv.db) + checkpoints/state.json
-                          │
-                          ▼
-              exporter → CSV and/or JSON under exports/
+                          â”‚
+                          â–¼
+              exporter â†’ CSV and/or JSON under exports/
 ```
 
 **Important differences from vlr-scraper:**
@@ -45,7 +45,7 @@ CLI (argparse) ──► BrowserManager (CloakBrowser | Camoufox)
 | Concept | This repo | vlr-scraper |
 |---------|-----------|-------------|
 | Transport | **Browser-first** (always) | httpx first, browser on CF |
-| Circuit breaker | **No** — 429/403 use long backoff (60s→300s) | Global consecutive-failure breaker |
+| Circuit breaker | **No** â€” 429/403 use long backoff (60sâ†’300s) | Global consecutive-failure breaker |
 | Concurrency | Effectively **one request at a time** via shared rate limiter | Multi-worker queue |
 | Resume | Checkpoint JSON + DB primary keys | SQLite `crawl_queue` |
 
@@ -115,8 +115,8 @@ hltv-scraper scrape --match-url "https://www.hltv.org/matches/<id>/<slug>"
 
 | Setting | Value |
 |---------|-------|
-| `MIN_DELAY` / `MAX_DELAY` | 4.0s – 9.0s between requests |
-| `BATCH_PAUSE_EVERY` | 30 requests → 20–40s pause |
+| `MIN_DELAY` / `MAX_DELAY` | 4.0s â€“ 9.0s between requests |
+| `BATCH_PAUSE_EVERY` | 30 requests â†’ 20â€“40s pause |
 | `MAX_RETRIES` | 10 |
 | `BACKOFF_START` / `BACKOFF_MAX` | 60s / 300s after 429/403-class failures |
 | `HEADLESS` | `True` |
@@ -153,9 +153,9 @@ Exports land as dated files under `exports/` (e.g. `matches_YYYY-MM-DD.csv`).
 - **Browser-only.** No lightweight HTTP path; CloakBrowser/Camoufox required.
 - **Anti-bot friction.** Challenge pages, layout shifts, and intermittent empty parses are expected; extractors log and continue.
 - **Not a circuit breaker.** Unlike vlr-scraper, failures use per-request retry + long sleep, not a global trip.
-- **Data gaps.** Listing scrapers may insert skeleton rows; detail scrapers fill stats later — intermediate DBs look sparse.
+- **Data gaps.** Listing scrapers may insert skeleton rows; detail scrapers fill stats later â€” intermediate DBs look sparse.
 - **Legal/ToS risk.** HLTV ToS may prohibit bulk automation; operator owns compliance.
-- **Tests** cover parsing helpers, checkpoint atomicity, and packaging smoke — not live HLTV pages.
+- **Tests** cover parsing helpers, checkpoint atomicity, and packaging smoke â€” not live HLTV pages.
 
 ---
 
@@ -163,13 +163,13 @@ Exports land as dated files under `exports/` (e.g. `matches_YYYY-MM-DD.csv`).
 
 | Layer | Actually used |
 |-------|----------------|
-| Runtime | Python ≥3.11, asyncio |
+| Runtime | Python â‰¥3.11, asyncio |
 | CLI | argparse (`main.py` / `hltv-scraper` entry) |
 | Config | python-dotenv + module-level constants |
 | Browser | **cloakbrowser** (default) or **camoufox**; playwright listed for stack compatibility |
 | HTML | beautifulsoup4 + **lxml** parser |
 | Storage | aiosqlite |
-| Export | pandas `read_sql` → CSV/JSON |
+| Export | pandas `read_sql` â†’ CSV/JSON |
 | Retry helpers | tenacity (dependency); primary pacing is custom `RateLimiter` |
 | Logging | loguru |
 | Quality | pytest (dev) |
@@ -178,6 +178,10 @@ Exports land as dated files under `exports/` (e.g. `matches_YYYY-MM-DD.csv`).
 
 ## License
 
-MIT © ark-daemon — see [LICENSE](LICENSE).
+MIT Â© ark-daemon â€” see [LICENSE](LICENSE).
 
 See also [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md).
+
+## Command reference
+
+Full Typer-generated CLI docs: [COMMANDS.md](COMMANDS.md).

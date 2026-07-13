@@ -1,21 +1,15 @@
 """
-main.py - CLI entrypoint for the structural data extraction pipeline.
+hltv-scraper CLI — CS2 esports extraction from HLTV.org.
 
 Usage:
-  python main.py scrape --all
-  python main.py scrape --matches
-  python main.py scrape --players
-  python main.py scrape --teams
-  python main.py scrape --events
-  python main.py scrape --rankings
-  python main.py scrape --news
-  python main.py scrape --match-url <base_url>/matches/<id>/<slug>
-  python main.py export --csv
-  python main.py export --table TABLE_NAME
-  python main.py status
+  hltv-scraper scrape --all
+  hltv-scraper scrape --matches
+  hltv-scraper export --csv
+  hltv-scraper status
 """
 
-import argparse
+from __future__ import annotations
+
 import asyncio
 import re
 import signal
@@ -23,16 +17,26 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Annotated, Any
 
-from loguru import logger
+import typer
 
 import config
+from cli_ui import (
+    configure_rich_logging,
+    console,
+    end_summary_table,
+    scrape_progress,
+    startup_panel,
+    status_table,
+    timed_run,
+)
 from core.browser import BrowserManager
 from core.checkpoint import Checkpoint
 from core.exporter import Exporter
 from db.database import Database
+from loguru import logger
 
-# All tables for status display
 ALL_TABLES = [
     "matches",
     "map_results",
@@ -52,30 +56,34 @@ ALL_TABLES = [
     "news",
 ]
 
-# Global state
-_db: Database | None = None
-_browser: BrowserManager | None = None
-_checkpoint: Checkpoint | None = None
+app = typer.Typer(
+    name="hltv-scraper",
+    help="HLTV.org CS2 esports scraper — browser-paced extraction to SQLite.",
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+    pretty_exceptions_show_locals=False,
+)
+scrape_app = typer.Typer(
+    help="Run one or more domain scrapers.",
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+)
+app.add_typer(scrape_app, name="scrape")
 
 
-# Graceful shutdown
-
-
-def _signal_handler():
+def _signal_handler() -> None:
     logger.warning("Received shutdown signal. Cancelling tasks...")
     raise SystemExit(0)
 
 
 def _install_signal_handlers() -> None:
-    """Install signal handlers using asyncio when possible (Unix),
-    falling back to plain signal.signal on Windows."""
     try:
         loop = asyncio.get_running_loop()
         loop.add_signal_handler(signal.SIGINT, _signal_handler)
         loop.add_signal_handler(signal.SIGTERM, _signal_handler)
     except (NotImplementedError, RuntimeError):
-        # Windows or no running loop yet - fall back to sync handlers
-        def _sync_handler(sig, frame):
+
+        def _sync_handler(sig, frame):  # type: ignore[no-untyped-def]
             logger.warning(f"Received signal {sig}. Shutting down...")
             sys.exit(0)
 
@@ -83,94 +91,40 @@ def _install_signal_handlers() -> None:
         signal.signal(signal.SIGTERM, _sync_handler)
 
 
-# Setup
-
-
-def _setup_logging():
-    log_path = Path(config.LOG_DIR) / "scraper.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    logger.remove()
-    logger.add(
-        sys.stderr,
-        level="INFO",
-        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | {message}",
-    )
-    logger.add(
-        str(log_path),
-        level="DEBUG",
-        rotation="50 MB",
-        retention="30 days",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{line} | {message}",
-    )
-
-
-def _create_dirs():
+def _create_dirs() -> None:
     for d in (config.CHECKPOINT_DIR, config.LOG_DIR, config.EXPORT_DIR):
         Path(d).mkdir(parents=True, exist_ok=True)
 
 
 async def _startup() -> tuple[Database, BrowserManager, Checkpoint]:
-    global _db, _browser, _checkpoint
-
     _create_dirs()
-    _setup_logging()
+    configure_rich_logging("INFO", Path(config.LOG_DIR) / "scraper.log")
 
-    logger.info("=" * 60)
-    logger.info("Data Extraction Pipeline - Starting up")
-    logger.info(f"  DB path:        {config.DB_PATH}")
-    logger.info(f"  Checkpoint dir: {config.CHECKPOINT_DIR}")
-    logger.info(f"  Log dir:        {config.LOG_DIR}")
-    logger.info("=" * 60)
+    startup_panel(
+        title="hltv-scraper · run config",
+        rows={
+            "Base URL": config.BASE_URL,
+            "DB path": config.DB_PATH,
+            "Export dir": config.EXPORT_DIR,
+            "Browser": config.BROWSER_BACKEND,
+            "Rate limit": f"{config.MIN_DELAY}–{config.MAX_DELAY}s + batch pauses",
+            "Output format": "csv / json (on export)",
+            "Headless": config.HEADLESS,
+        },
+    )
 
-    # Database
     db = Database(config.DB_PATH)
     await db.connect()
     await db.init_db()
-    _db = db
 
-    # Checkpoint
     checkpoint = Checkpoint()
     checkpoint.load()
-    _checkpoint = checkpoint
 
-    # Browser
     browser = BrowserManager()
-    _browser = browser
 
-    # Log DB row counts
-    logger.info("Current DB row counts:")
-    for table in ALL_TABLES:
-        count = await db.row_count(table)
-        logger.info(f"  {table:<30} {count:>12,}")
-
+    counts = {table: await db.row_count(table) for table in ALL_TABLES}
+    logger.info("DB ready · {} tables · {} total rows", len(ALL_TABLES), sum(counts.values()))
     return db, browser, checkpoint
-
-
-# Scraper runner
-
-
-async def _run_scraper(scraper_cls, db, browser, checkpoint) -> dict:
-    """Instantiate and run a single scraper, returning its summary."""
-    scraper = scraper_cls(db, browser, checkpoint)
-    start = time.time()
-    logger.info(f"\n{'=' * 60}")
-    logger.info(f"Starting: {scraper_cls.__name__}")
-    logger.info(f"{'=' * 60}")
-
-    stats = await scraper.run()
-
-    elapsed = time.time() - start
-    elapsed_str = _format_elapsed(elapsed)
-
-    # Summary
-    print(f"\n  [ {scraper_cls.__name__} ]")
-    print(f"    processed : {stats.get('processed', 0):>10,}")
-    print(f"    inserted  : {stats.get('inserted', 0):>10,}")
-    print(f"    skipped   : {stats.get('skipped', 0):>10,}")
-    print(f"    errors    : {stats.get('errors', 0):>10,}")
-    print(f"    elapsed   : {elapsed_str:>10}\n")
-
-    return stats
 
 
 def _format_elapsed(seconds: float) -> str:
@@ -184,10 +138,27 @@ def _format_elapsed(seconds: float) -> str:
     return f"{s}s"
 
 
-# Commands
+async def _run_scraper(scraper_cls, db, browser, checkpoint) -> dict[str, Any]:
+    scraper = scraper_cls(db, browser, checkpoint)
+    start = time.time()
+    logger.info("Starting {}", scraper_cls.__name__)
+    stats = await scraper.run()
+    stats = stats or {}
+    stats["_elapsed"] = time.time() - start
+    return stats
 
 
-async def cmd_scrape(args, db, browser, checkpoint):
+async def _scrape_pipeline(
+    *,
+    run_all: bool,
+    matches: bool,
+    players: bool,
+    teams: bool,
+    events: bool,
+    rankings: bool,
+    news: bool,
+    match_url: str | None,
+) -> None:
     from scrapers.event_detail import EventDetailScraper
     from scrapers.events import EventsScraper
     from scrapers.match_detail import MatchDetailScraper
@@ -202,97 +173,113 @@ async def cmd_scrape(args, db, browser, checkpoint):
     from scrapers.team_stats import TeamStatsScraper
     from scrapers.teams import TeamsScraper
 
-    # Launch browser only when needed
-    await browser.launch()
+    db, browser, checkpoint = await _startup()
+    _install_signal_handlers()
 
-    if args.match_url:
-        await cmd_scrape_single_match(args.match_url, db, browser, checkpoint)
-        return
+    try:
+        await browser.launch()
 
-    # Map of --flag to scraper class(es)
-    scraper_map = {
-        "matches": [MatchesScraper, MatchDetailScraper, MatchStatsScraper],
-        "players": [PlayersScraper, PlayerStatsScraper],
-        "teams": [TeamsScraper, TeamStatsScraper, RosterHistoryScraper],
-        "events": [EventsScraper, EventDetailScraper],
-        "rankings": [RankingsScraper, PlayerRankingsScraper],
-        "news": [NewsScraper],
-    }
+        if match_url:
+            await _scrape_single_match(match_url, db, browser, checkpoint)
+            return
 
-    # Full ordered list for --all
-    all_scrapers = [
-        EventsScraper,
-        TeamsScraper,
-        PlayersScraper,
-        MatchesScraper,
-        MatchDetailScraper,
-        MatchStatsScraper,
-        TeamStatsScraper,
-        PlayerStatsScraper,
-        RosterHistoryScraper,
-        EventDetailScraper,
-        RankingsScraper,
-        PlayerRankingsScraper,
-        NewsScraper,
-    ]
+        scraper_map = {
+            "matches": [MatchesScraper, MatchDetailScraper, MatchStatsScraper],
+            "players": [PlayersScraper, PlayerStatsScraper],
+            "teams": [TeamsScraper, TeamStatsScraper, RosterHistoryScraper],
+            "events": [EventsScraper, EventDetailScraper],
+            "rankings": [RankingsScraper, PlayerRankingsScraper],
+            "news": [NewsScraper],
+        }
+        all_scrapers = [
+            EventsScraper,
+            TeamsScraper,
+            PlayersScraper,
+            MatchesScraper,
+            MatchDetailScraper,
+            MatchStatsScraper,
+            TeamStatsScraper,
+            PlayerStatsScraper,
+            RosterHistoryScraper,
+            EventDetailScraper,
+            RankingsScraper,
+            PlayerRankingsScraper,
+            NewsScraper,
+        ]
 
-    # Determine which scrapers to run
-    if args.all:
-        to_run = all_scrapers
-    else:
-        to_run = []
-        for flag, classes in scraper_map.items():
-            if getattr(args, flag, False):
-                to_run.extend(classes)
+        flags = {
+            "matches": matches,
+            "players": players,
+            "teams": teams,
+            "events": events,
+            "rankings": rankings,
+            "news": news,
+        }
+        if run_all:
+            to_run = all_scrapers
+        else:
+            to_run = []
+            for flag, classes in scraper_map.items():
+                if flags.get(flag):
+                    to_run.extend(classes)
 
-    if not to_run:
-        print("No scrape target specified. Use --all, --match-url, or a specific flag.")
-        print("Run: python main.py scrape --help")
-        return
+        if not to_run:
+            console.print(
+                "[yellow]No scrape target specified.[/] Use [bold]--all[/], [bold]--match-url[/], "
+                "or a domain flag. See [bold]hltv-scraper scrape --help[/]."
+            )
+            raise typer.Exit(1)
 
-    overall_start = time.time()
-    all_stats = []
-    for cls in to_run:
-        s = await _run_scraper(cls, db, browser, checkpoint)
-        all_stats.append((cls.__name__, s))
+        overall_start = time.time()
+        all_stats: list[tuple[str, dict[str, Any]]] = []
+        with scrape_progress() as progress:
+            task = progress.add_task("hltv scrapers", total=len(to_run))
+            for cls in to_run:
+                progress.update(task, description=f"Running {cls.__name__}")
+                stats = await _run_scraper(cls, db, browser, checkpoint)
+                all_stats.append((cls.__name__, stats))
+                progress.advance(task)
 
-    total_elapsed = _format_elapsed(time.time() - overall_start)
+        duration = time.time() - overall_start
+        total_processed = sum(s.get("processed", 0) for _, s in all_stats)
+        total_inserted = sum(s.get("inserted", 0) for _, s in all_stats)
+        total_skipped = sum(s.get("skipped", 0) for _, s in all_stats)
+        total_errors = sum(s.get("errors", 0) for _, s in all_stats)
 
-    # Final summary table
-    print("\n" + "=" * 72)
-    print(
-        f"{'SCRAPER':<35} {'PROCESSED':>10} {'INSERTED':>10} {'SKIPPED':>8} {'ERRORS':>7}"
-    )
-    print("=" * 72)
-    for name, s in all_stats:
-        print(
-            f"{name:<35} {s.get('processed', 0):>10,} {s.get('inserted', 0):>10,} "
-            f"{s.get('skipped', 0):>8,} {s.get('errors', 0):>7,}"
+        rows = [
+            (name, f"proc={s.get('processed', 0)} ins={s.get('inserted', 0)} "
+                   f"skip={s.get('skipped', 0)} err={s.get('errors', 0)}")
+            for name, s in all_stats
+        ]
+        rows.extend(
+            [
+                ("TOTAL processed", f"{total_processed:,}"),
+                ("TOTAL inserted", f"{total_inserted:,}"),
+                ("TOTAL skipped", f"{total_skipped:,}"),
+                ("TOTAL errors", f"{total_errors:,}"),
+            ]
         )
-    print("=" * 72)
-    print(f"Total elapsed: {total_elapsed}\n")
+        end_summary_table(title="Scrape summary", rows=rows, duration_s=duration)
+    finally:
+        checkpoint.save()
+        await browser.close()
+        await db.close()
 
 
-async def cmd_scrape_single_match(match_url: str, db, browser, checkpoint):
-    """Fetch and save one match (detail + stats) by URL only."""
+async def _scrape_single_match(match_url: str, db, browser, checkpoint) -> None:
     from scrapers.match_detail import MatchDetailScraper
     from scrapers.match_stats import MatchStatsScraper
 
     match_url = match_url.strip()
-    if not match_url:
-        print("Missing --match-url value")
-        return
-
     mid_match = re.search(r"/matches/(\d+)/", match_url)
     if not mid_match:
-        print(
-            "Invalid match URL. Expected format: <base_url>/matches/<id>/<slug>"
+        console.print(
+            "[red]Invalid match URL.[/] Expected: "
+            f"{config.BASE_URL}/matches/<id>/<slug>"
         )
-        return
+        raise typer.Exit(1)
 
     match_id = int(mid_match.group(1))
-
-    # Ensure parent row exists for FK relations before detail/stat inserts.
     existing = await db.execute(
         "SELECT match_id FROM matches WHERE match_id = ?", [match_id]
     )
@@ -310,165 +297,180 @@ async def cmd_scrape_single_match(match_url: str, db, browser, checkpoint):
     detail_scraper = MatchDetailScraper(db, browser, checkpoint)
     stats_scraper = MatchStatsScraper(db, browser, checkpoint)
 
-    soup = await detail_scraper.fetch(match_url)
-    if soup is None:
-        print(f"Failed to fetch match page: {match_url}")
-        return
+    with scrape_progress() as progress:
+        task = progress.add_task(f"match {match_id}", total=None)
+        soup = await detail_scraper.fetch(match_url)
+        if soup is None:
+            console.print(f"[red]Failed to fetch match page:[/] {match_url}")
+            raise typer.Exit(1)
 
-    map_rows, mapstats_entries = detail_scraper._parse_match_detail(soup, match_id)
-    if map_rows:
-        await db.bulk_insert("map_results", map_rows, replace=True)
+        map_rows, mapstats_entries = detail_scraper._parse_match_detail(soup, match_id)
+        if map_rows:
+            await db.bulk_insert("map_results", map_rows, replace=True)
 
-    all_rows = []
-    for entry in mapstats_entries:
-        url = entry.get("mapstats_url")
-        if not url:
-            continue
-
-        map_number = entry.get("map_number", 1)
-        map_name = entry.get("map_name", "unknown")
-
-        base_soup = await stats_scraper.fetch(url)
-        if not base_soup:
-            continue
-
-        all_rows.extend(
-            stats_scraper._parse_scoreboard(
-                base_soup, match_id, map_number, map_name, side="overall"
+        all_rows = []
+        for entry in mapstats_entries:
+            url = entry.get("mapstats_url")
+            if not url:
+                continue
+            map_number = entry.get("map_number", 1)
+            map_name = entry.get("map_name", "unknown")
+            base_soup = await stats_scraper.fetch(url)
+            if not base_soup:
+                continue
+            all_rows.extend(
+                stats_scraper._parse_scoreboard(
+                    base_soup, match_id, map_number, map_name, side="overall"
+                )
             )
+            ct_url = url + "?side=ct" if "?" not in url else url + "&side=ct"
+            ct_soup = await stats_scraper.fetch(ct_url)
+            if ct_soup:
+                all_rows.extend(
+                    stats_scraper._parse_scoreboard(
+                        ct_soup, match_id, map_number, map_name, side="ct"
+                    )
+                )
+            t_url = url + "?side=t" if "?" not in url else url + "&side=t"
+            t_soup = await stats_scraper.fetch(t_url)
+            if t_soup:
+                all_rows.extend(
+                    stats_scraper._parse_scoreboard(
+                        t_soup, match_id, map_number, map_name, side="t"
+                    )
+                )
+
+        if all_rows:
+            await db.bulk_insert("player_match_stats", all_rows, replace=True)
+        progress.update(task, description=f"match {match_id} · done")
+
+    end_summary_table(
+        title="Single match scrape",
+        rows=[
+            ("match_id", match_id),
+            ("map_results", len(map_rows)),
+            ("player_match_stats", len(all_rows)),
+        ],
+    )
+
+
+@scrape_app.callback(invoke_without_command=True)
+def scrape(
+    ctx: typer.Context,
+    run_all: Annotated[bool, typer.Option("--all", help="Run all scrapers in dependency order.")] = False,
+    matches: Annotated[bool, typer.Option("--matches", help="Matches + map/player match stats.")] = False,
+    players: Annotated[bool, typer.Option("--players", help="Players + player stats.")] = False,
+    teams: Annotated[bool, typer.Option("--teams", help="Teams + team stats + roster history.")] = False,
+    events: Annotated[bool, typer.Option("--events", help="Events + event detail placements.")] = False,
+    rankings: Annotated[bool, typer.Option("--rankings", help="World + player ranking snapshots.")] = False,
+    news: Annotated[bool, typer.Option("--news", help="News archive.")] = False,
+    match_url: Annotated[
+        str | None,
+        typer.Option("--match-url", help="Scrape one match by full HLTV URL."),
+    ] = None,
+) -> None:
+    """Run HLTV extractors (browser-backed, rate-limited)."""
+    if ctx.invoked_subcommand is not None:
+        return
+    asyncio.run(
+        _scrape_pipeline(
+            run_all=run_all,
+            matches=matches,
+            players=players,
+            teams=teams,
+            events=events,
+            rankings=rankings,
+            news=news,
+            match_url=match_url,
         )
-
-        ct_url = url + "?side=ct" if "?" not in url else url + "&side=ct"
-        ct_soup = await stats_scraper.fetch(ct_url)
-        if ct_soup:
-            all_rows.extend(
-                stats_scraper._parse_scoreboard(
-                    ct_soup, match_id, map_number, map_name, side="ct"
-                )
-            )
-
-        t_url = url + "?side=t" if "?" not in url else url + "&side=t"
-        t_soup = await stats_scraper.fetch(t_url)
-        if t_soup:
-            all_rows.extend(
-                stats_scraper._parse_scoreboard(
-                    t_soup, match_id, map_number, map_name, side="t"
-                )
-            )
-
-    if all_rows:
-        await db.bulk_insert("player_match_stats", all_rows, replace=True)
-
-    print("\nSingle match scrape complete:")
-    print(f"  match_id: {match_id}")
-    print(f"  map_results rows: {len(map_rows)}")
-    print(f"  player_match_stats rows: {len(all_rows)}")
-
-
-async def cmd_export(args, db):
-    exporter = Exporter(db_path=config.DB_PATH, export_dir=config.EXPORT_DIR)
-    if args.table:
-        if args.table not in ALL_TABLES:
-            print(f"Invalid table '{args.table}'.")
-            print(f"Allowed tables: {', '.join(ALL_TABLES)}")
-            return
-        if args.json:
-            await asyncio.to_thread(exporter.export_table_json, args.table)
-        else:
-            await asyncio.to_thread(exporter.export_table, args.table)
-    elif args.csv:
-        await asyncio.to_thread(exporter.export_all)
-    elif args.json:
-        await asyncio.to_thread(exporter.export_all_json)
-    else:
-        print("Specify --csv, --json, or --table TABLE_NAME")
-
-
-async def cmd_status(db):
-    print("\n" + "=" * 50)
-    print(f"{'TABLE':<30} {'ROW COUNT':>12}")
-    print("=" * 50)
-    total = 0
-    for table in ALL_TABLES:
-        count = await db.row_count(table)
-        print(f"{table:<30} {count:>12,}")
-        total += count
-    print("=" * 50)
-    print(f"{'TOTAL':<30} {total:>12,}")
-    print()
-
-
-# Main entry
-
-
-async def _main():
-    parser = argparse.ArgumentParser(
-        description="Structural data extraction pipeline - automated DOM parsing and resilient data harvesting.",
-        formatter_class=argparse.RawTextHelpFormatter,
-    )
-    subparsers = parser.add_subparsers(dest="command")
-
-    # scrape
-    scrape_p = subparsers.add_parser("scrape", help="Run scrapers")
-    scrape_p.add_argument(
-        "--all", action="store_true", help="Run all scrapers in order"
-    )
-    scrape_p.add_argument(
-        "--matches", action="store_true", help="Scrape matches + map stats"
-    )
-    scrape_p.add_argument(
-        "--players", action="store_true", help="Scrape players + player stats"
-    )
-    scrape_p.add_argument(
-        "--teams", action="store_true", help="Scrape teams + team stats + rosters"
-    )
-    scrape_p.add_argument(
-        "--events", action="store_true", help="Scrape events + event details"
-    )
-    scrape_p.add_argument(
-        "--rankings", action="store_true", help="Scrape world + player rankings"
-    )
-    scrape_p.add_argument("--news", action="store_true", help="Scrape news archive")
-    scrape_p.add_argument(
-        "--match-url",
-        metavar="MATCH_URL",
-        help="Scrape one match by URL (detail + stats only)",
     )
 
-    # export
-    export_p = subparsers.add_parser("export", help="Export DB tables to CSV/JSON")
-    export_p.add_argument("--csv", action="store_true", help="Export ALL tables to CSV")
-    export_p.add_argument("--json", action="store_true", help="Export ALL tables to JSON")
-    export_p.add_argument(
-        "--table", metavar="TABLE_NAME", help="Export a specific table"
+
+@app.command("export")
+def export(
+    csv: Annotated[bool, typer.Option("--csv", help="Export all tables to CSV.")] = False,
+    json: Annotated[bool, typer.Option("--json", help="Export all tables to JSON.")] = False,
+    table: Annotated[
+        str | None,
+        typer.Option("--table", help=f"Export one table. One of: {', '.join(ALL_TABLES)}"),
+    ] = None,
+) -> None:
+    """Export SQLite tables to CSV and/or JSON under exports/."""
+
+    async def _run() -> list[str]:
+        db, browser, checkpoint = await _startup()
+        written: list[str] = []
+        try:
+            exporter = Exporter(db_path=config.DB_PATH, export_dir=config.EXPORT_DIR)
+
+            def _paths_from_summaries(summaries) -> list[str]:
+                out: list[str] = []
+                if not summaries:
+                    return out
+                if isinstance(summaries, dict):
+                    summaries = [summaries]
+                for item in summaries:
+                    if isinstance(item, dict) and item.get("file"):
+                        out.append(str(item["file"]))
+                    elif item:
+                        out.append(str(item))
+                return out
+
+            if table:
+                if table not in ALL_TABLES:
+                    console.print(f"[red]Invalid table[/] '{table}'.")
+                    console.print(f"Allowed: {', '.join(ALL_TABLES)}")
+                    raise typer.Exit(1)
+                if json:
+                    summary = await asyncio.to_thread(exporter.export_table_json, table)
+                else:
+                    summary = await asyncio.to_thread(exporter.export_table, table)
+                written.extend(_paths_from_summaries(summary))
+            elif csv:
+                summaries = await asyncio.to_thread(exporter.export_all)
+                written.extend(_paths_from_summaries(summaries))
+            elif json:
+                summaries = await asyncio.to_thread(exporter.export_all_json)
+                written.extend(_paths_from_summaries(summaries))
+            else:
+                console.print("[yellow]Specify --csv, --json, and/or --table TABLE_NAME[/]")
+                raise typer.Exit(1)
+        finally:
+            checkpoint.save()
+            await browser.close()
+            await db.close()
+        return written
+
+    with timed_run() as elapsed:
+        paths = asyncio.run(_run())
+    end_summary_table(
+        title="Export summary",
+        rows=[("Files", len(paths))],
+        outputs=paths,
+        duration_s=elapsed[0],
     )
 
-    # status
-    subparsers.add_parser("status", help="Print row counts for all tables")
 
-    args = parser.parse_args()
-    if not args.command:
-        parser.print_help()
-        return
+@app.command("status")
+def status() -> None:
+    """Print row counts for every warehouse table."""
 
-    db, browser, checkpoint = await _startup()
-    _install_signal_handlers()
+    async def _run() -> dict[str, int]:
+        db, browser, checkpoint = await _startup()
+        try:
+            return {table: await db.row_count(table) for table in ALL_TABLES}
+        finally:
+            checkpoint.save()
+            await browser.close()
+            await db.close()
 
-    try:
-        if args.command == "scrape":
-            await cmd_scrape(args, db, browser, checkpoint)
-        elif args.command == "export":
-            await cmd_export(args, db)
-        elif args.command == "status":
-            await cmd_status(db)
-    finally:
-        checkpoint.save()
-        await browser.close()
-        await db.close()
+    counts = asyncio.run(_run())
+    status_table(f"HLTV warehouse · {config.DB_PATH}", counts)
 
 
-def main():
-    asyncio.run(_main())
+def main() -> None:
+    """Console script entrypoint."""
+    app()
 
 
 if __name__ == "__main__":

@@ -48,7 +48,7 @@ class RateLimiter:
         self._request_count: int = 0
         self._batch_count: int = 0
         self._initialized = True
-        logger.info("[Rate Limiter] Initialized.")
+        logger.debug("[Rate Limiter] Initialized.")
 
     async def wait(self) -> None:
         """
