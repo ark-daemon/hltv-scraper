@@ -1,5 +1,5 @@
 """
-core/exporter.py — Export SQLite tables to CSV and JSON files.
+core/exporter.py - Export SQLite tables to CSV and JSON files.
 """
 
 import json

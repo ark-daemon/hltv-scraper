@@ -1,5 +1,5 @@
 """
-config.py — Global configuration for the data extraction pipeline.
+config.py - Global configuration for the data extraction pipeline.
 """
 
 import os

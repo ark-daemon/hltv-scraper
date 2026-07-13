@@ -1,5 +1,5 @@
 """
-scrapers/events.py — Scrape all archived and upcoming events.
+scrapers/events.py - Scrape all archived and upcoming events.
 
 Saves event IDs to checkpoints/all_event_ids.json for EventDetailScraper.
 """
@@ -33,7 +33,7 @@ class EventsScraper(BaseScraper):
         done_set = self.checkpoint.get_done_set(self.SCRAPER_KEY)
         all_event_ids: set[int] = set(existing_ids)
 
-        # Step 1 — Archive (paginated)
+        # Step 1 - Archive (paginated)
         offset = 0
         max_consecutive_errors = 5
         consecutive_errors = 0
@@ -73,7 +73,7 @@ class EventsScraper(BaseScraper):
 
             offset += 50
 
-        # Step 2 — Upcoming events
+        # Step 2 - Upcoming events
         url = f"{BASE_URL}/events"
         soup = await self.fetch(url)
         if soup:

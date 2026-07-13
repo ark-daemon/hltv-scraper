@@ -1,5 +1,5 @@
 """
-scrapers/rankings.py — Scrape current and all historical weekly world team rankings.
+scrapers/rankings.py - Scrape current and all historical weekly world team rankings.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -42,7 +42,7 @@ class RankingsScraper(BaseScraper):
         logger.info(f"[{self.name}] Starting...")
         stats = {"processed": 0, "inserted": 0, "skipped": 0, "errors": 0}
 
-        # Step 1 — Current ranking
+        # Step 1 - Current ranking
         current_rows = await self._scrape_ranking_page(
             f"{BASE_URL}/ranking/teams",
             snapshot_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -52,7 +52,7 @@ class RankingsScraper(BaseScraper):
             stats["inserted"] += n
             stats["processed"] += 1
 
-        # Step 2 — Historical weekly snapshots
+        # Step 2 - Historical weekly snapshots
         all_mondays = list(self._generate_mondays())
         done_set = self.checkpoint.get_done_set(self.SCRAPER_KEY)
         total = len(all_mondays)

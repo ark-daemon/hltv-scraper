@@ -1,5 +1,5 @@
 """
-scrapers/team_stats.py — Scrape overall and per-map stats for each team.
+scrapers/team_stats.py - Scrape overall and per-map stats for each team.
 """
 
 import json

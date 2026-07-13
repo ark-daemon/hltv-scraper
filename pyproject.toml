@@ -1,17 +1,22 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "hltv-scraper"
 version = "0.1.0"
-description = "Production-grade structural data extraction and pipeline architecture"
+description = "Async HLTV.org scraper for CS2 esports matches, players, teams, events, and rankings"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
+authors = [{ name = "ark-daemon" }]
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -32,11 +37,28 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
+    "pytest>=8.0.0",
+    "ruff>=0.4.0",
 ]
 
 [project.scripts]
 hltv-scraper = "main:main"
 
+[project.urls]
+Homepage = "https://github.com/ark-daemon/hltv-scraper"
+Repository = "https://github.com/ark-daemon/hltv-scraper"
+
 [tool.setuptools]
 py-modules = ["main", "config"]
+packages = ["core", "db", "scrapers"]
+
+[tool.setuptools.package-data]
+db = ["schema.sql"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,5 +1,5 @@
 """
-scrapers/teams.py — Collect all team IDs and scrape team profile pages.
+scrapers/teams.py - Collect all team IDs and scrape team profile pages.
 """
 
 import json
@@ -27,7 +27,7 @@ class TeamsScraper(BaseScraper):
         logger.info(f"[{self.name}] Starting...")
         stats = {"processed": 0, "inserted": 0, "skipped": 0, "errors": 0}
 
-        # Step 1 — Collect team IDs
+        # Step 1 - Collect team IDs
         team_id_map = await self._collect_team_ids()
 
         # Also pull team IDs from matches table
@@ -40,7 +40,7 @@ class TeamsScraper(BaseScraper):
         self._save_team_ids(team_id_map)
         logger.info(f"[{self.name}] Total unique team IDs: {len(team_id_map)}")
 
-        # Step 2 — Scrape profiles
+        # Step 2 - Scrape profiles
         existing_ids = await self.db.get_all_ids("teams", "team_id")
         done_set = self.checkpoint.get_done_set(self.SCRAPER_KEY)
         total = len(team_id_map)

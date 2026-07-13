@@ -1,5 +1,5 @@
 """
-scrapers/players.py — Collect all player IDs and scrape player profile pages.
+scrapers/players.py - Collect all player IDs and scrape player profile pages.
 """
 
 import json
@@ -27,7 +27,7 @@ class PlayersScraper(BaseScraper):
         logger.info(f"[{self.name}] Starting...")
         stats = {"processed": 0, "inserted": 0, "skipped": 0, "errors": 0}
 
-        # Step 1 — Collect player IDs
+        # Step 1 - Collect player IDs
         player_id_map = await self._collect_player_ids()
 
         # Also gather IDs from player_match_stats table
@@ -39,7 +39,7 @@ class PlayersScraper(BaseScraper):
         self._save_player_ids(player_id_map)
         logger.info(f"[{self.name}] Total unique player IDs: {len(player_id_map)}")
 
-        # Step 2 — Scrape profiles
+        # Step 2 - Scrape profiles
         existing_ids = await self.db.get_all_ids("players", "player_id")
         done_set = self.checkpoint.get_done_set(self.SCRAPER_KEY)
         total = len(player_id_map)

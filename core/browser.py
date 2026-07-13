@@ -1,5 +1,5 @@
 """
-core/browser.py — BrowserManager for resilient, human-like page fetching.
+core/browser.py - BrowserManager for resilient, human-like page fetching.
 
 Handles automated navigation, challenge-page detection, retries, and
 automatic session restarts every 200 requests to maintain stable access.
@@ -120,7 +120,7 @@ class BrowserManager:
         Fetch a URL and return a BeautifulSoup object.
 
         Steps:
-          1. Call rate_limiter.wait() — ALWAYS, no exceptions
+          1. Call rate_limiter.wait() - ALWAYS, no exceptions
           2. Navigate with stealth browser
           3. Wait for document.readyState == 'complete'
           4. Detect and wait out access-challenge pages
@@ -149,7 +149,7 @@ class BrowserManager:
                 if response is not None and response.status in (429, 403, 503):
                     logger.warning(
                         f"[Browser] HTTP {response.status} on {url} "
-                        f"(attempt {attempt + 1}/{MAX_RETRIES}) — backing off."
+                        f"(attempt {attempt + 1}/{MAX_RETRIES}) - backing off."
                     )
                     await rate_limiter.backoff(attempt)
                     continue

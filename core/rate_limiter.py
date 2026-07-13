@@ -1,5 +1,5 @@
 """
-core/rate_limiter.py — Human-like rate limiter singleton.
+core/rate_limiter.py - Human-like rate limiter singleton.
 
 Every single HTTP request must call rate_limiter.wait() before fetching.
 No bypasses. No fast paths. Always sleeps.
@@ -59,7 +59,7 @@ class RateLimiter:
         self._request_count += 1
         delay = random.uniform(MIN_DELAY, MAX_DELAY)
         logger.debug(
-            f"[Rate Limiter] Request #{self._request_count} — sleeping {delay:.1f}s"
+            f"[Rate Limiter] Request #{self._request_count} - sleeping {delay:.1f}s"
         )
         await asyncio.sleep(delay)
 
@@ -68,7 +68,7 @@ class RateLimiter:
             self._batch_count += 1
             batch_delay = random.uniform(BATCH_PAUSE_MIN, BATCH_PAUSE_MAX)
             logger.info(
-                f"[Rate Limiter] Batch pause #{self._batch_count} — sleeping {batch_delay:.1f}s"
+                f"[Rate Limiter] Batch pause #{self._batch_count} - sleeping {batch_delay:.1f}s"
             )
             await asyncio.sleep(batch_delay)
 
@@ -80,7 +80,7 @@ class RateLimiter:
         sleep_time = min(BACKOFF_START * (2**attempt), BACKOFF_MAX)
         sleep_time *= random.uniform(0.75, 1.25)
         logger.warning(
-            f"[Rate Limiter] Backoff attempt {attempt} — sleeping {sleep_time:.1f}s"
+            f"[Rate Limiter] Backoff attempt {attempt} - sleeping {sleep_time:.1f}s"
         )
         await asyncio.sleep(sleep_time)
 
@@ -89,5 +89,5 @@ class RateLimiter:
         return self._request_count
 
 
-# Singleton instance — import and use this everywhere
+# Singleton instance - import and use this everywhere
 rate_limiter = RateLimiter()

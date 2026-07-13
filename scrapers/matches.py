@@ -1,5 +1,5 @@
 """
-scrapers/matches.py — Scrape all match results, upcoming, and live matches.
+scrapers/matches.py - Scrape all match results, upcoming, and live matches.
 
 Saves match_ids to checkpoints/all_match_ids.json for use by downstream scrapers.
 """
@@ -34,7 +34,7 @@ class MatchesScraper(BaseScraper):
         existing_ids = await self.db.get_all_ids("matches", "match_id")
         all_match_ids = set(existing_ids)
 
-        # Step 1 — Historical results (paginated)
+        # Step 1 - Historical results (paginated)
         offset = 0
         page_num = 0
         max_consecutive_errors = 5
@@ -87,7 +87,7 @@ class MatchesScraper(BaseScraper):
                 )
             offset += 100
 
-        # Step 2 — Upcoming + Live matches
+        # Step 2 - Upcoming + Live matches
         url = f"{BASE_URL}/matches"
         soup = await self.fetch(url)
         if soup:
@@ -160,7 +160,7 @@ class MatchesScraper(BaseScraper):
         """
         Extract data from a single match result row element.
 
-        Note: lxml breaks nested <a> tags — HLTV result rows use an outer
+        Note: lxml breaks nested <a> tags - HLTV result rows use an outer
         <div class="result-con"> wrapping an <a class="a-reset"> which itself
         may contain inner <a> tags (e.g. for event links). When lxml encounters
         a nested anchor it terminates the outer one, so team names, scores and
@@ -187,7 +187,7 @@ class MatchesScraper(BaseScraper):
             if not match_id:
                 return None
 
-            # Timestamp — search whole context
+            # Timestamp - search whole context
             ts_el = search_ctx.select_one("[data-zonedgrouping-entry-unix]")
             timestamp = None
             date_str = fallback_date
@@ -202,7 +202,7 @@ class MatchesScraper(BaseScraper):
                     except Exception:
                         pass
 
-            # Teams — search whole context (may be displaced siblings)
+            # Teams - search whole context (may be displaced siblings)
             team_els = search_ctx.select("div.team")
             team1_name = self.safe_text(team_els[0]) if len(team_els) > 0 else None
             team2_name = self.safe_text(team_els[1]) if len(team_els) > 1 else None
@@ -219,7 +219,7 @@ class MatchesScraper(BaseScraper):
                 if parent_a:
                     team2_id = self.extract_id_from_url(parent_a.get("href", ""), -2)
 
-            # Scores — search whole context
+            # Scores - search whole context
             score_el = search_ctx.select_one(
                 "td.result-score, span.result-score, div.result-score"
             )
@@ -235,7 +235,7 @@ class MatchesScraper(BaseScraper):
                         elif team2_score > team1_score:
                             winner_id = team2_id
 
-            # Event name — can be in the anchor itself (before nested links break it)
+            # Event name - can be in the anchor itself (before nested links break it)
             event_el = search_ctx.select_one(
                 "td.event span.event-name, span.event-name, div.event-name"
             )
@@ -251,7 +251,7 @@ class MatchesScraper(BaseScraper):
             format_el = search_ctx.select_one("td.format, div.map-text, span.format")
             match_format = self.safe_text(format_el)
 
-            # Stars — search whole context (often displaced by nested anchors)
+            # Stars - search whole context (often displaced by nested anchors)
             star_els = search_ctx.select("i.fa-star, i[class*='star']")
             stars = len(star_els)
 

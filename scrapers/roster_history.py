@@ -1,5 +1,5 @@
 """
-scrapers/roster_history.py — Scrape player roster history for each team.
+scrapers/roster_history.py - Scrape player roster history for each team.
 """
 
 import json

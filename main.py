@@ -1,5 +1,5 @@
 """
-main.py — CLI entrypoint for the structural data extraction pipeline.
+main.py - CLI entrypoint for the structural data extraction pipeline.
 
 Usage:
   python main.py scrape --all
@@ -74,7 +74,7 @@ def _install_signal_handlers() -> None:
         loop.add_signal_handler(signal.SIGINT, _signal_handler)
         loop.add_signal_handler(signal.SIGTERM, _signal_handler)
     except (NotImplementedError, RuntimeError):
-        # Windows or no running loop yet — fall back to sync handlers
+        # Windows or no running loop yet - fall back to sync handlers
         def _sync_handler(sig, frame):
             logger.warning(f"Received signal {sig}. Shutting down...")
             sys.exit(0)
@@ -116,7 +116,7 @@ async def _startup() -> tuple[Database, BrowserManager, Checkpoint]:
     _setup_logging()
 
     logger.info("=" * 60)
-    logger.info("Data Extraction Pipeline — Starting up")
+    logger.info("Data Extraction Pipeline - Starting up")
     logger.info(f"  DB path:        {config.DB_PATH}")
     logger.info(f"  Checkpoint dir: {config.CHECKPOINT_DIR}")
     logger.info(f"  Log dir:        {config.LOG_DIR}")
@@ -403,7 +403,7 @@ async def cmd_status(db):
 
 async def _main():
     parser = argparse.ArgumentParser(
-        description="Structural data extraction pipeline — automated DOM parsing and resilient data harvesting.",
+        description="Structural data extraction pipeline - automated DOM parsing and resilient data harvesting.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command")

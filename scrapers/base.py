@@ -1,5 +1,5 @@
 """
-scrapers/base.py — Abstract base class for all HLTV scrapers.
+scrapers/base.py - Abstract base class for all HLTV scrapers.
 
 Provides shared utilities: fetch, ID extraction, safe parsing helpers,
 progress logging, and checkpoint/DB integration.
@@ -19,9 +19,9 @@ class BaseScraper(ABC):
     Abstract base for all scrapers. Subclasses must implement run().
 
     Constructor args:
-        db         — Database instance
-        browser    — BrowserManager instance
-        checkpoint — Checkpoint instance
+        db         - Database instance
+        browser    - BrowserManager instance
+        checkpoint - Checkpoint instance
     """
 
     def __init__(self, db, browser, checkpoint) -> None:
@@ -48,6 +48,18 @@ class BaseScraper(ABC):
     # ------------------------------------------------------------------
     # ID extraction helpers
     # ------------------------------------------------------------------
+
+    def extract_id_from_url_regex(self, url: str | None, pattern: str) -> int | None:
+        """Extract an integer ID from *url* using a regex with one capture group."""
+        if not url:
+            return None
+        match = re.search(pattern, url)
+        if not match:
+            return None
+        try:
+            return int(match.group(1))
+        except (TypeError, ValueError, IndexError):
+            return None
 
     def extract_id_from_url(self, url: str, position: int = -2) -> int | None:
         """
@@ -142,7 +154,7 @@ class BaseScraper(ABC):
         else:
             msg = f"[{self.name}] {done} processed"
         if extra:
-            msg += f" — {extra}"
+            msg += f" - {extra}"
         logger.info(msg)
 
     # ------------------------------------------------------------------

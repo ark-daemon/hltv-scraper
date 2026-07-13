@@ -16,6 +16,10 @@ checkpoints/
 # Secrets
 .env
 
+# Virtual environments
+.venv/
+venv/
+
 .pytest_cache/
 
 # Archives

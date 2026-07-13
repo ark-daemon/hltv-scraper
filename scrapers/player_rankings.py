@@ -1,5 +1,5 @@
 """
-scrapers/player_rankings.py — Scrape the annual HLTV Top 20 player rankings.
+scrapers/player_rankings.py - Scrape the annual HLTV Top 20 player rankings.
 """
 
 import re

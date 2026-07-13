@@ -1,5 +1,5 @@
 """
-scrapers/player_stats.py — Scrape career, per-event, and per-map stats for each player.
+scrapers/player_stats.py - Scrape career, per-event, and per-map stats for each player.
 """
 
 import json

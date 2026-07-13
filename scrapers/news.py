@@ -1,5 +1,5 @@
 """
-scrapers/news.py — Scrape all news articles from HLTV's monthly archive.
+scrapers/news.py - Scrape all news articles from HLTV's monthly archive.
 """
 
 import re
