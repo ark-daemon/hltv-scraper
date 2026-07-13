@@ -1,6 +1,6 @@
-# HLTV Scraper — CS2 Esports Data Pipeline
+# HLTV Scraper â€” CS2 Esports Data Pipeline
 
-Async Python 3.11+ scraper for **Counter-Strike 2 esports data from [HLTV.org](https://www.hltv.org)** — matches, map stats, players, teams, events, world rankings, and news.
+Async Python 3.11+ scraper for **Counter-Strike 2 esports data from [HLTV.org](https://www.hltv.org)** â€” matches, map stats, players, teams, events, world rankings, and news.
 
 Data is stored in a local SQLite warehouse with checkpoint/resume support and CSV/JSON export.
 
@@ -51,9 +51,9 @@ Defaults are intentionally slow (single browser session, multi-second delays) to
 
 | Setting | Default |
 |---------|---------|
-| `MIN_DELAY` / `MAX_DELAY` | 4s – 9s between requests |
-| Batch pause every 30 requests | 20s – 40s |
-| Backoff on 429/403 | 60s – 300s |
+| `MIN_DELAY` / `MAX_DELAY` | 4s â€“ 9s between requests |
+| Batch pause every 30 requests | 20s â€“ 40s |
+| Backoff on 429/403 | 60s â€“ 300s |
 
 Do not run multiple instances at once.
 
@@ -72,4 +72,7 @@ pytest -q
 
 ## License
 
-MIT © 2026 ark-daemon — see [LICENSE](LICENSE).
+MIT Â© 2026 ark-daemon â€” see [LICENSE](LICENSE).
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md). Changes: [CHANGELOG.md](CHANGELOG.md).
