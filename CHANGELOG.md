@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- README rewritten against live code: accurate transport (httpx vs CloakBrowser), real config defaults, real schema, honest limitations, fleet links, and consistent resilience terminology (circuit breaker only where implemented).
+
 ### Planned
 - Broader golden HTML/JSON fixtures for site layout regressions
 - Schema reference documentation for consumers of exported tables
