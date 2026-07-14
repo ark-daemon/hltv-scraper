@@ -27,6 +27,7 @@ dependencies = [
     "aiosqlite>=0.19.0",
     "numpy>=1.26.0",
     "pandas>=2.1.0",
+    "pyarrow>=15.0.0",
     "tqdm>=4.66.0",
     "loguru>=0.7.0",
     "tenacity>=8.2.0",
@@ -51,7 +52,7 @@ Homepage = "https://github.com/ark-daemon/hltv-scraper"
 Repository = "https://github.com/ark-daemon/hltv-scraper"
 
 [tool.setuptools]
-py-modules = ["main", "config", "cli_ui"]
+py-modules = ["main", "config", "cli_ui", "snapshot"]
 packages = ["core", "db", "scrapers"]
 
 [tool.setuptools.package-data]

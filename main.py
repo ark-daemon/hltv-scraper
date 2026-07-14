@@ -468,6 +468,46 @@ def status() -> None:
     status_table(f"HLTV warehouse · {config.DB_PATH}", counts)
 
 
+@app.command("snapshot")
+def snapshot(
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Directory for data.json/csv/parquet + manifest.json."),
+    ] = Path("export"),
+) -> None:
+    """Write fleet match-level snapshot (data.json/csv/parquet + manifest.json)."""
+    from snapshot import write_snapshot
+
+    configure_rich_logging("INFO", Path(config.LOG_DIR) / "scraper.log")
+    startup_panel(
+        title="hltv-scraper · snapshot",
+        rows={
+            "DB path": config.DB_PATH,
+            "Output dir": out,
+            "Grain": "match/series",
+            "Files": "data.json, data.csv, data.parquet, manifest.json",
+        },
+    )
+    with timed_run() as elapsed:
+        manifest = write_snapshot(config.DB_PATH, out)
+    end_summary_table(
+        title="Snapshot summary",
+        rows=[
+            ("Records", manifest.get("record_count")),
+            ("Status mapped", manifest.get("stats", {}).get("status_mapped")),
+            ("Status heuristic", manifest.get("stats", {}).get("status_heuristic")),
+            ("Dropped (no teams)", manifest.get("stats", {}).get("dropped_no_teams")),
+        ],
+        outputs=[
+            out / "manifest.json",
+            out / "data.json",
+            out / "data.csv",
+            out / "data.parquet",
+        ],
+        duration_s=elapsed[0],
+    )
+
+
 def main() -> None:
     """Console script entrypoint."""
     app()

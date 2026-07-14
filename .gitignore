@@ -39,3 +39,7 @@ dist/
 .mypy_cache/
 .coverage
 htmlcov/
+
+# Fleet match snapshots
+export/
+
