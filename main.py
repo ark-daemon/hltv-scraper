@@ -474,6 +474,10 @@ def snapshot(
         Path,
         typer.Option("--out", "-o", help="Directory for data.json/csv/parquet + manifest.json."),
     ] = Path("export"),
+    publish: Annotated[
+        bool,
+        typer.Option("--publish", help="Upload export/ to Cloudflare R2 after writing."),
+    ] = False,
 ) -> None:
     """Write fleet match-level snapshot (data.json/csv/parquet + manifest.json)."""
     from snapshot import write_snapshot
@@ -486,6 +490,7 @@ def snapshot(
             "Output dir": out,
             "Grain": "match/series",
             "Files": "data.json, data.csv, data.parquet, manifest.json",
+            "Publish R2": publish,
         },
     )
     with timed_run() as elapsed:
@@ -506,6 +511,41 @@ def snapshot(
         ],
         duration_s=elapsed[0],
     )
+    if publish:
+        _do_publish(out, "hltv")
+
+
+@app.command("publish")
+def publish(
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Local export directory to upload."),
+    ] = Path("export"),
+) -> None:
+    """Upload existing export/ snapshot to Cloudflare R2 and verify public manifest."""
+    configure_rich_logging("INFO", Path(config.LOG_DIR) / "scraper.log")
+    _do_publish(out, "hltv")
+
+
+def _do_publish(out: Path, slug: str) -> None:
+    from r2_publish import upload_snapshot
+
+    startup_panel(
+        title=f"{slug} · R2 publish",
+        rows={"Local dir": out, "R2 prefix": f"{slug}/", "Verify": "GET public manifest.json"},
+    )
+    with timed_run() as elapsed:
+        result = upload_snapshot(export_dir=out, repo_slug=slug)
+    end_summary_table(
+        title="Publish summary",
+        rows=[
+            ("Records verified", result["record_count"]),
+            ("Manifest URL", result["manifest_url"]),
+        ],
+        outputs=list(result["urls"].values()),
+        duration_s=elapsed[0],
+    )
+    console.print(f"[bold green]Public manifest:[/] {result['manifest_url']}")
 
 
 def main() -> None:

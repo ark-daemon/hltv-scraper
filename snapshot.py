@@ -136,14 +136,30 @@ def _parse_match_date(
     return out
 
 
-def _winner(team_a: str, team_b: str, winner_id: int | None, team1_id: int | None, team2_id: int | None) -> str | None:
-    if winner_id is None:
+def _winner(
+    team_a: str | None,
+    team_b: str | None,
+    winner_id: int | None,
+    team1_id: int | None,
+    team2_id: int | None,
+    score_a: int | None,
+    score_b: int | None,
+) -> str | None:
+    """Prefer winner_id; else derive from scores. Must equal team_a or team_b exactly."""
+    w: str | None = None
+    if winner_id is not None:
+        if team1_id is not None and winner_id == team1_id:
+            w = team_a
+        elif team2_id is not None and winner_id == team2_id:
+            w = team_b
+    if w is None and score_a is not None and score_b is not None and team_a and team_b:
+        if score_a > score_b:
+            w = team_a
+        elif score_b > score_a:
+            w = team_b
+    if w is not None and w not in (team_a, team_b):
         return None
-    if team1_id is not None and winner_id == team1_id:
-        return team_a
-    if team2_id is not None and winner_id == team2_id:
-        return team_b
-    return None
+    return w
 
 
 def build_rows(db_path: str | Path) -> list[dict[str, Any]]:
@@ -178,9 +194,7 @@ def build_rows(db_path: str | Path) -> list[dict[str, Any]]:
         match_date = _parse_match_date(r["date"], r["timestamp"], status=status, has_scores=has_scores)
 
         native_id = r["match_id"]
-        winner = _winner(team_a or "", team_b or "", r["winner_id"], r["team1_id"], r["team2_id"])
-        if winner is not None and winner not in (team_a, team_b):
-            winner = None
+        winner = _winner(team_a, team_b, r["winner_id"], r["team1_id"], r["team2_id"], score_a, score_b)
 
         source_url = r["hltv_url"] or None
         # Do not invent slug-based URLs; only use stored URL.
@@ -207,48 +221,24 @@ def build_rows(db_path: str | Path) -> list[dict[str, Any]]:
 
 
 def write_snapshot(db_path: str | Path, out_dir: str | Path) -> dict[str, Any]:
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
+    from snapshot_io import write_snapshot_files
+
     rows = build_rows(db_path)
     if not rows:
         logger.warning("snapshot empty after filters")
-
-    json_path = out / "data.json"
-    csv_path = out / "data.csv"
-    parquet_path = out / "data.parquet"
-    manifest_path = out / "manifest.json"
-
-    json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    with csv_path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=COLUMNS, extrasaction="ignore")
-        w.writeheader()
-        for row in rows:
-            w.writerow({k: row.get(k) for k in COLUMNS})
-
-    try:
-        import pandas as pd
-
-        pd.DataFrame(rows, columns=COLUMNS).to_parquet(parquet_path, index=False)
-    except Exception as exc:
-        logger.error("parquet export failed: {}", exc)
-        parquet_path.write_bytes(b"")
-
-    manifest = {
-        "source": REPO_SLUG,
-        "game": GAME,
-        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "record_count": len(rows),
-        "schema_version": SCHEMA_VERSION,
-        "columns": COLUMNS,
-        "files": {"json": "data.json", "csv": "data.csv", "parquet": "data.parquet"},
-        "stats": dict(_stats),
-    }
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    manifest = write_snapshot_files(
+        out_dir=Path(out_dir),
+        rows=rows,
+        columns=COLUMNS,
+        source=REPO_SLUG,
+        game=GAME,
+        schema_version=SCHEMA_VERSION,
+        extra_manifest={"stats": dict(_stats)},
+    )
     logger.info(
         "snapshot wrote {} rows -> {} (mapped={} heuristic={} dropped_teams={})",
         len(rows),
-        out,
+        out_dir,
         _stats["status_mapped"],
         _stats["status_heuristic"],
         _stats["dropped_no_teams"],
